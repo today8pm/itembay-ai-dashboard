@@ -23,8 +23,7 @@ try:
     st.success("✅ 클라우드 데이터 연결 성공!")
 
     # 2. AI 설정 (Gemini 무료 API 활용)
-    llm = ChatGoogleGenerativeAI(model="gemini-pro", google_api_key=st.secrets["GEMINI_API_KEY"])
-    agent = create_pandas_dataframe_agent(llm, df, verbose=True, allow_dangerous_code=True)
+    llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash", google_api_key=st.secrets["GEMINI_API_KEY"])
 
     # 3. 채팅 인터페이스
     st.title("🤖 무엇이든 물어보세요 (김부장 전용)")

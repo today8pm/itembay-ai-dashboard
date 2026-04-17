@@ -77,7 +77,7 @@ if df is not None:
             verbose=True,
             allow_dangerous_code=True,
             handle_parsing_errors=True,
-            agent_type="tool-calling"  # ✅ 핵심 수정! Gemini에 최적화된 에이전트 타입
+            agent_type="tool-calling"
         )
 
         st.title("🤖 아이템베이 실시간 데이터 전략 어시스턴트")
@@ -90,8 +90,24 @@ if df is not None:
                 st.write(query)
             with st.chat_message("assistant"):
                 with st.spinner("통합 데이터를 분석 중입니다..."):
-                    response = agent.invoke({"input": query})  # ✅ .run() → .invoke() 로 변경
-                    st.write(response["output"])
+                    try:
+                        response = agent.invoke({"input": query})
+
+                        # ✅ 디버깅: 응답 전체 구조 확인
+                        st.write("📦 응답 타입:", type(response))
+                        st.write("📦 응답 내용 전체:", response)
+
+                        # 응답에서 output 꺼내기 (안전하게)
+                        if isinstance(response, dict):
+                            output = response.get("output", response.get("text", str(response)))
+                        else:
+                            output = str(response)
+
+                        st.write("✅ 최종 답변:", output)
+
+                    except Exception as e:
+                        st.error(f"❌ 분석 중 오류: {e}")
+                        st.exception(e)  # 상세 traceback 출력
 
     except Exception as e:
         st.error(f"🚨 AI 엔진 초기화 실패: {e}")

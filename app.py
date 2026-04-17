@@ -56,6 +56,33 @@ def load_combined_data_from_s3():
         return None
 
 
+# ✅ 응답에서 텍스트만 깔끔하게 추출하는 함수
+def extract_output(response):
+    raw = ""
+    if isinstance(response, dict):
+        raw = response.get("output", "")
+        if not str(raw).strip():
+            steps = response.get("intermediate_steps", [])
+            if steps:
+                last = steps[-1]
+                if isinstance(last, (list, tuple)) and len(last) > 1:
+                    raw = last[1]
+    else:
+        raw = response
+
+    # output이 리스트인 경우 (텍스트 조각들 합치기)
+    if isinstance(raw, list):
+        parts = []
+        for item in raw:
+            if isinstance(item, dict) and item.get("type") == "text":
+                parts.append(item.get("text", ""))
+            elif isinstance(item, str):
+                parts.append(item)
+        return "".join(parts).strip()
+
+    return str(raw).strip()
+
+
 # 3. 데이터 로드 실행
 df = load_combined_data_from_s3()
 
@@ -92,23 +119,7 @@ if df is not None:
                 with st.spinner("통합 데이터를 분석 중입니다..."):
                     try:
                         response = agent.invoke({"input": query})
-
-                        # ✅ 타입 상관없이 무조건 문자열로 변환 후 처리
-                        output = ""
-                        if isinstance(response, dict):
-                            raw = response.get("output", "")
-
-                            # output이 비어있으면 intermediate_steps에서 꺼내기
-                            if not str(raw).strip():
-                                steps = response.get("intermediate_steps", [])
-                                if steps:
-                                    last_result = steps[-1]
-                                    if isinstance(last_result, (list, tuple)) and len(last_result) > 1:
-                                        raw = last_result[1]
-
-                            output = str(raw).strip()  # ✅ 무조건 str() 로 감싸서 strip()
-                        else:
-                            output = str(response).strip()
+                        output = extract_output(response)
 
                         if output:
                             st.write(output)

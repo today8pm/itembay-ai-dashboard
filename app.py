@@ -49,6 +49,25 @@ df = load_combined_data_from_s3()
 if df is not None:
     st.success(f"✅ 'transdb' 폴더 내 {len(df):,}건의 데이터를 성공적으로 통합했습니다!")
 
+    # ✅ 진단 코드 (데이터 구조 확인용 - 문제 해결 후 삭제 가능)
+    with st.expander("🔍 데이터 진단 정보 (확인 후 삭제 가능)"):
+        st.write("**📋 컬럼 목록 및 타입:**")
+        st.dataframe(df.dtypes.reset_index().rename(columns={"index": "컬럼명", 0: "타입"}))
+
+        st.write("**👀 상위 5개 행:**")
+        st.dataframe(df.head(5))
+
+        st.write("**📅 날짜/텍스트 컬럼 샘플값:**")
+        date_cols = df.select_dtypes(include=['object', 'datetime64[ns]', 'datetime64[us]']).columns.tolist()
+        if date_cols:
+            for col in date_cols:
+                st.write(f"- `{col}` : `{df[col].iloc[0]}`  (타입: `{df[col].dtype}`)")
+        else:
+            st.write("날짜/텍스트 컬럼 없음")
+
+        st.write("**🔢 전체 데이터 shape:**")
+        st.write(f"행: {df.shape[0]:,}개 / 열: {df.shape[1]}개")
+
     try:
         llm = ChatGoogleGenerativeAI(
             model="gemini-2.5-flash-lite",

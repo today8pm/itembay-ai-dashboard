@@ -7,3 +7,4 @@ langchain-google-genai
 langchain-experimental
 plotly
 fastparquet
+tabulate

@@ -36,6 +36,21 @@ def load_combined_data_from_s3():
             return None
 
         combined_df = pd.concat(all_dfs, ignore_index=True)
+
+        # ✅ 문제 1 수정 - 완료일시 문자열 → datetime 변환
+        # "2025-01-01 오전 12:00:16" 형식 처리
+        combined_df['완료일시'] = combined_df['완료일시'].str.replace('오전', 'AM').str.replace('오후', 'PM')
+        combined_df['완료일시'] = pd.to_datetime(combined_df['완료일시'], format='%Y-%m-%d %p %I:%M:%S', errors='coerce')
+
+        # ✅ 문제 2 수정 - 거래금액, 수수료 문자열 → 숫자 변환
+        # "\4,000" → 4000 으로 변환
+        for col in ['거래금액', '수수료']:
+            combined_df[col] = combined_df[col].astype(str).str.replace(r'[\\,\s]', '', regex=True)
+            combined_df[col] = pd.to_numeric(combined_df[col], errors='coerce')
+
+        # ✅ 수량도 정수로 변환
+        combined_df['수량'] = combined_df['수량'].astype(int, errors='ignore')
+
         return combined_df
 
     except Exception as e:
@@ -48,22 +63,6 @@ df = load_combined_data_from_s3()
 
 if df is not None:
     st.success(f"✅ 'transdb' 폴더 내 {len(df):,}건의 데이터를 성공적으로 통합했습니다!")
-
-    # ✅ 진단 코드 수정 - pandas 버전 호환
-    with st.expander("🔍 데이터 진단 정보 (확인 후 삭제 가능)"):
-
-        st.write("**📋 컬럼 목록 및 타입:**")
-        st.dataframe(df.dtypes.reset_index().rename(columns={"index": "컬럼명", 0: "타입"}))
-
-        st.write("**👀 상위 5개 행:**")
-        st.dataframe(df.head(5))
-
-        st.write("**📅 전체 컬럼 샘플값:**")
-        for col in df.columns:
-            st.write(f"- `{col}` : `{df[col].iloc[0]}`  (타입: `{df[col].dtype}`)")
-
-        st.write("**🔢 전체 데이터 shape:**")
-        st.write(f"행: {df.shape[0]:,}개 / 열: {df.shape[1]}개")
 
     try:
         llm = ChatGoogleGenerativeAI(

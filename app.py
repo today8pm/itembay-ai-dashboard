@@ -49,13 +49,14 @@ if df is not None:
     st.success(f"✅ 'transdb' 폴더 내 {len(df):,}건의 데이터를 성공적으로 통합했습니다!")
 
     try:
-        llm = ChatGoogleGenerativeAI(
-            model="gemini-2.0-flash-lite",  # ✅ 핵심 수정! 무료 1,500회/일
-            google_api_key=st.secrets["GEMINI_API_KEY"],
-            convert_system_message_to_human=True,
-            temperature=0,
-            streaming=False  # ✅ 청크 에러 방지
-        )
+       llm = ChatGoogleGenerativeAI(
+    model="gemini-2.5-flash-lite",  # ✅ 이것만 바꾸세요!
+    google_api_key=st.secrets["GEMINI_API_KEY"],
+    convert_system_message_to_human=True,
+    temperature=0,
+    streaming=False
+)
+
         
         agent = create_pandas_dataframe_agent(
             llm, 

@@ -27,11 +27,25 @@ df = load_data_from_s3()
 if df is not None:
     st.success("✅ 클라우드 데이터 연결 성공!")
 
-    # 2. AI 설정 (최신 모델명 반영)
+   # 2. AI 설정 (404 에러 해결을 위한 수정본)
     try:
-        llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash", google_api_key=st.secrets["GEMINI_API_KEY"])
+        # 모델명을 'gemini-1.5-flash' 대신 'models/gemini-1.5-flash'로 명시하거나
+        # 최신 안정화 별칭인 'gemini-1.5-flash-latest'를 사용합니다.
+        llm = ChatGoogleGenerativeAI(
+            model="gemini-1.5-flash-latest", 
+            google_api_key=st.secrets["GEMINI_API_KEY"],
+            safety_settings={}, # 세이프티 설정으로 인한 차단 방지
+            convert_system_message_to_human=True
+        )
+        
         # 에이전트 생성
-        agent = create_pandas_dataframe_agent(llm, df, verbose=True, allow_dangerous_code=True)
+        agent = create_pandas_dataframe_agent(
+            llm, 
+            df, 
+            verbose=True, 
+            allow_dangerous_code=True,
+            handle_parsing_errors=True # 파싱 에러 시 재시도 로직 추가
+        )
         
         # 3. 채팅 인터페이스
         st.title("🤖 무엇이든 물어보세요 (김부장 전용)")

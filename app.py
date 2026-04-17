@@ -19,26 +19,22 @@ def load_combined_data_from_s3():
         )
         
         bucket_name = st.secrets["S3_BUCKET_NAME"]
-        folder_prefix = "transdb/"  # 부장님이 만드신 폴더명
+        folder_prefix = "transdb/"
         
-        # 폴더 내 파일 목록 가져오기
         response = s3.list_objects_v2(Bucket=bucket_name, Prefix=folder_prefix)
         
         all_dfs = []
         if 'Contents' in response:
             for obj in response['Contents']:
                 file_key = obj['Key']
-                # .parquet 파일만 골라서 읽기
                 if file_key.endswith('.parquet'):
                     file_obj = s3.get_object(Bucket=bucket_name, Key=file_key)
-                    # Parquet은 BytesIO로 읽어야 합니다.
                     temp_df = pd.read_parquet(BytesIO(file_obj['Body'].read()))
                     all_dfs.append(temp_df)
         
         if not all_dfs:
             return None
             
-        # 모든 파일을 하나로 수직 통합 (concat)
         combined_df = pd.concat(all_dfs, ignore_index=True)
         return combined_df
         
@@ -52,16 +48,15 @@ df = load_combined_data_from_s3()
 if df is not None:
     st.success(f"✅ 'transdb' 폴더 내 {len(df):,}건의 데이터를 성공적으로 통합했습니다!")
 
-    # 3. AI 설정 (부장님 계정 최적화 모델)
     try:
         llm = ChatGoogleGenerativeAI(
-            model="gemini-1.5-flash", # 또는 "gemini-2.0-flash-exp"
+            model="gemini-2.0-flash-lite",  # ✅ 핵심 수정! 무료 1,500회/일
             google_api_key=st.secrets["GEMINI_API_KEY"],
             convert_system_message_to_human=True,
-            temperature=0
+            temperature=0,
+            streaming=False  # ✅ 청크 에러 방지
         )
         
-        # 에이전트 생성
         agent = create_pandas_dataframe_agent(
             llm, 
             df, 

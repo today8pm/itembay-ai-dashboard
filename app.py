@@ -5,10 +5,8 @@ from io import StringIO
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_experimental.agents import create_pandas_dataframe_agent
 
-# 1. 페이지 설정
 st.set_page_config(page_title="아이템베이 전략 분석실", layout="wide")
 
-# 2. S3에서 데이터 불러오기 함수
 @st.cache_data
 def load_data_from_s3():
     try:
@@ -28,18 +26,16 @@ df = load_data_from_s3()
 if df is not None:
     st.success(f"✅ 클라우드 데이터 연결 성공! (총 {len(df):,} 건)")
 
-    # 3. AI 설정 (404 에러를 피하기 위한 가장 표준적인 설정)
     try:
-        # 모델명을 'models/gemini-1.5-flash'로 고정합니다. 
-        # 1.5-flash-latest가 안 될 경우 가장 기본형인 이 이름이 최선입니다.
+        # 모델명을 'gemini-2.0-flash-exp'로 변경합니다.
+        # 이 모델은 현재 404 에러 없이 가장 안정적으로 무료 호출이 가능합니다.
         llm = ChatGoogleGenerativeAI(
-            model="models/gemini-1.5-flash", 
+            model="gemini-2.0-flash-exp", 
             google_api_key=st.secrets["GEMINI_API_KEY"],
             convert_system_message_to_human=True,
             temperature=0
         )
         
-        # 에이전트 생성
         agent = create_pandas_dataframe_agent(
             llm, 
             df, 
@@ -48,7 +44,6 @@ if df is not None:
             handle_parsing_errors=True
         )
         
-        # 4. 채팅 인터페이스
         st.title("🤖 아이템베이 데이터 전략 어시스턴트")
         query = st.chat_input("데이터에 대해 궁금한 점을 입력하세요.")
         

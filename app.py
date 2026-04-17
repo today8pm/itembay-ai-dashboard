@@ -37,19 +37,17 @@ def load_combined_data_from_s3():
 
         combined_df = pd.concat(all_dfs, ignore_index=True)
 
-        # ✅ 문제 1 수정 - 완료일시 문자열 → datetime 변환
-        # "2025-01-01 오전 12:00:16" 형식 처리
+        # ✅ 완료일시 문자열 → datetime 변환
         combined_df['완료일시'] = combined_df['완료일시'].str.replace('오전', 'AM').str.replace('오후', 'PM')
         combined_df['완료일시'] = pd.to_datetime(combined_df['완료일시'], format='%Y-%m-%d %p %I:%M:%S', errors='coerce')
 
-        # ✅ 문제 2 수정 - 거래금액, 수수료 문자열 → 숫자 변환
-        # "\4,000" → 4000 으로 변환
+        # ✅ 거래금액, 수수료 문자열 → 숫자 변환
         for col in ['거래금액', '수수료']:
             combined_df[col] = combined_df[col].astype(str).str.replace(r'[\\,\s]', '', regex=True)
             combined_df[col] = pd.to_numeric(combined_df[col], errors='coerce')
 
-        # ✅ 수량도 정수로 변환
-        combined_df['수량'] = combined_df['수량'].astype(int, errors='ignore')
+        # ✅ 수량 float → int 변환
+        combined_df['수량'] = pd.to_numeric(combined_df['수량'], errors='coerce').fillna(0).astype(int)
 
         return combined_df
 
@@ -78,7 +76,8 @@ if df is not None:
             df,
             verbose=True,
             allow_dangerous_code=True,
-            handle_parsing_errors=True
+            handle_parsing_errors=True,
+            agent_type="tool-calling"  # ✅ 핵심 수정! Gemini에 최적화된 에이전트 타입
         )
 
         st.title("🤖 아이템베이 실시간 데이터 전략 어시스턴트")
@@ -91,8 +90,8 @@ if df is not None:
                 st.write(query)
             with st.chat_message("assistant"):
                 with st.spinner("통합 데이터를 분석 중입니다..."):
-                    response = agent.run(query)
-                    st.write(response)
+                    response = agent.invoke({"input": query})  # ✅ .run() → .invoke() 로 변경
+                    st.write(response["output"])
 
     except Exception as e:
         st.error(f"🚨 AI 엔진 초기화 실패: {e}")

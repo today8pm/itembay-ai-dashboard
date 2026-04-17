@@ -1,4 +1,4 @@
-streamlit
+streamlit==1.45.0
 pandas
 boto3
 pyarrow
@@ -6,3 +6,4 @@ langchain
 langchain-google-genai
 langchain-experimental
 plotly
+fastparquet

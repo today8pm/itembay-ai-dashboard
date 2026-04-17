@@ -64,7 +64,7 @@ if df is not None:
 
     try:
         llm = ChatGoogleGenerativeAI(
-            model="gemini-2.5-flash-lite",
+            model="gemini-2.5-flash",      # ✅ lite → flash 로 업그레이드
             google_api_key=st.secrets["GEMINI_API_KEY"],
             convert_system_message_to_human=True,
             temperature=0,
@@ -93,21 +93,27 @@ if df is not None:
                     try:
                         response = agent.invoke({"input": query})
 
-                        # ✅ 디버깅: 응답 전체 구조 확인
-                        st.write("📦 응답 타입:", type(response))
-                        st.write("📦 응답 내용 전체:", response)
-
-                        # 응답에서 output 꺼내기 (안전하게)
+                        # ✅ output이 비어있으면 intermediate_steps에서 꺼내기
+                        output = ""
                         if isinstance(response, dict):
-                            output = response.get("output", response.get("text", str(response)))
-                        else:
-                            output = str(response)
+                            output = response.get("output", "")
 
-                        st.write("✅ 최종 답변:", output)
+                            # output이 비어있으면 중간 실행 결과에서 찾기
+                            if not output.strip():
+                                steps = response.get("intermediate_steps", [])
+                                if steps:
+                                    last_result = steps[-1]
+                                    if isinstance(last_result, (list, tuple)) and len(last_result) > 1:
+                                        output = str(last_result[1])
+
+                        if output.strip():
+                            st.write(output)
+                        else:
+                            st.warning("응답을 받지 못했습니다. 다시 질문해 주세요.")
 
                     except Exception as e:
                         st.error(f"❌ 분석 중 오류: {e}")
-                        st.exception(e)  # 상세 traceback 출력
+                        st.exception(e)
 
     except Exception as e:
         st.error(f"🚨 AI 엔진 초기화 실패: {e}")

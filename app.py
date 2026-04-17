@@ -17,12 +17,12 @@ def load_combined_data_from_s3():
             aws_access_key_id=st.secrets["AWS_ACCESS_KEY"],
             aws_secret_access_key=st.secrets["AWS_SECRET_KEY"]
         )
-        
+
         bucket_name = st.secrets["S3_BUCKET_NAME"]
         folder_prefix = "transdb/"
-        
+
         response = s3.list_objects_v2(Bucket=bucket_name, Prefix=folder_prefix)
-        
+
         all_dfs = []
         if 'Contents' in response:
             for obj in response['Contents']:
@@ -31,54 +31,56 @@ def load_combined_data_from_s3():
                     file_obj = s3.get_object(Bucket=bucket_name, Key=file_key)
                     temp_df = pd.read_parquet(BytesIO(file_obj['Body'].read()))
                     all_dfs.append(temp_df)
-        
+
         if not all_dfs:
             return None
-            
+
         combined_df = pd.concat(all_dfs, ignore_index=True)
         return combined_df
-        
+
     except Exception as e:
         st.error(f"❌ 데이터 로드 중 오류 발생: {e}")
         return None
 
-# 데이터 로드 실행
+
+# 3. 데이터 로드 실행
 df = load_combined_data_from_s3()
 
 if df is not None:
     st.success(f"✅ 'transdb' 폴더 내 {len(df):,}건의 데이터를 성공적으로 통합했습니다!")
 
     try:
-       llm = ChatGoogleGenerativeAI(
-    model="gemini-2.5-flash-lite",  # ✅ 이것만 바꾸세요!
-    google_api_key=st.secrets["GEMINI_API_KEY"],
-    convert_system_message_to_human=True,
-    temperature=0,
-    streaming=False
-)
+        llm = ChatGoogleGenerativeAI(
+            model="gemini-2.5-flash-lite",
+            google_api_key=st.secrets["GEMINI_API_KEY"],
+            convert_system_message_to_human=True,
+            temperature=0,
+            streaming=False
+        )
 
-        
         agent = create_pandas_dataframe_agent(
-            llm, 
-            df, 
-            verbose=True, 
+            llm,
+            df,
+            verbose=True,
             allow_dangerous_code=True,
             handle_parsing_errors=True
         )
-        
+
         st.title("🤖 아이템베이 실시간 데이터 전략 어시스턴트")
         st.info("transdb 폴더의 모든 데이터를 실시간으로 합산하여 분석합니다.")
-        
+
         query = st.chat_input("궁금한 분석 내용을 입력하세요 (예: 25년 전체 거래액 알려줘)")
-        
+
         if query:
-            with st.chat_message("user"): st.write(query)
+            with st.chat_message("user"):
+                st.write(query)
             with st.chat_message("assistant"):
                 with st.spinner("통합 데이터를 분석 중입니다..."):
                     response = agent.run(query)
                     st.write(response)
-                    
+
     except Exception as e:
         st.error(f"🚨 AI 엔진 초기화 실패: {e}")
+
 else:
     st.warning("transdb 폴더 내에 데이터 파일이 없거나 S3 설정을 확인해야 합니다.")

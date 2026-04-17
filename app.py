@@ -27,10 +27,8 @@ if df is not None:
     st.success(f"✅ 클라우드 데이터 연결 성공! (총 {len(df):,} 건)")
 
     try:
-        # 모델명을 'gemini-2.0-flash-exp'로 변경합니다.
-        # 이 모델은 현재 404 에러 없이 가장 안정적으로 무료 호출이 가능합니다.
         llm = ChatGoogleGenerativeAI(
-            model="gemini-2.0-flash-exp", 
+            model="gemini-2.5-flash",  # ✅ 이 부분만 변경!
             google_api_key=st.secrets["GEMINI_API_KEY"],
             convert_system_message_to_human=True,
             temperature=0

@@ -28,12 +28,12 @@ df = load_data_from_s3()
 if df is not None:
     st.success(f"✅ 클라우드 데이터 연결 성공! (총 {len(df):,} 건)")
 
-    # 3. AI 설정 (404 에러 해결을 위한 모델명 수정)
+    # 3. AI 설정 (404 에러를 피하기 위한 가장 표준적인 설정)
     try:
-        # 모델명을 'gemini-1.5-flash-latest'로 설정합니다. 
-        # 이는 Gemini 3 사용 권한이 있는 계정에서도 가장 호환성이 높은 안정화 별칭입니다.
+        # 모델명을 'models/gemini-1.5-flash'로 고정합니다. 
+        # 1.5-flash-latest가 안 될 경우 가장 기본형인 이 이름이 최선입니다.
         llm = ChatGoogleGenerativeAI(
-            model="gemini-1.5-flash-latest", 
+            model="models/gemini-1.5-flash", 
             google_api_key=st.secrets["GEMINI_API_KEY"],
             convert_system_message_to_human=True,
             temperature=0
@@ -60,7 +60,6 @@ if df is not None:
                     st.write(response)
                     
     except Exception as e:
-        # 에러 발생 시 부장님이 바로 확인하실 수 있도록 메시지 노출
         st.error(f"🚨 AI 엔진 초기화 실패: {e}")
 else:
     st.warning("데이터를 불러오지 못했습니다. S3 설정과 Secrets를 확인해주세요.")

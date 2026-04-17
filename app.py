@@ -28,10 +28,11 @@ if df is not None:
 
     try:
         llm = ChatGoogleGenerativeAI(
-            model="gemini-2.5-flash",  # ✅ 이 부분만 변경!
+            model="gemini-2.5-flash",
             google_api_key=st.secrets["GEMINI_API_KEY"],
             convert_system_message_to_human=True,
-            temperature=0
+            temperature=0,
+            streaming=False  # ✅ 이 한 줄 추가가 핵심!
         )
         
         agent = create_pandas_dataframe_agent(

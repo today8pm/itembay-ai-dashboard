@@ -64,7 +64,7 @@ if df is not None:
 
     try:
         llm = ChatGoogleGenerativeAI(
-            model="gemini-2.5-flash",      # ✅ lite → flash 로 업그레이드
+            model="gemini-2.5-flash",
             google_api_key=st.secrets["GEMINI_API_KEY"],
             convert_system_message_to_human=True,
             temperature=0,
@@ -93,20 +93,24 @@ if df is not None:
                     try:
                         response = agent.invoke({"input": query})
 
-                        # ✅ output이 비어있으면 intermediate_steps에서 꺼내기
+                        # ✅ 타입 상관없이 무조건 문자열로 변환 후 처리
                         output = ""
                         if isinstance(response, dict):
-                            output = response.get("output", "")
+                            raw = response.get("output", "")
 
-                            # output이 비어있으면 중간 실행 결과에서 찾기
-                            if not output.strip():
+                            # output이 비어있으면 intermediate_steps에서 꺼내기
+                            if not str(raw).strip():
                                 steps = response.get("intermediate_steps", [])
                                 if steps:
                                     last_result = steps[-1]
                                     if isinstance(last_result, (list, tuple)) and len(last_result) > 1:
-                                        output = str(last_result[1])
+                                        raw = last_result[1]
 
-                        if output.strip():
+                            output = str(raw).strip()  # ✅ 무조건 str() 로 감싸서 strip()
+                        else:
+                            output = str(response).strip()
+
+                        if output:
                             st.write(output)
                         else:
                             st.warning("응답을 받지 못했습니다. 다시 질문해 주세요.")

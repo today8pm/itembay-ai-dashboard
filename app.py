@@ -101,7 +101,10 @@ def extract_output(response):
 # 4. 숫자 포맷 함수
 # ========================================
 def fmt(number):
-    return f"{int(number):,}"
+    try:
+        return f"{int(number):,}"
+    except:
+        return "0"
 
 
 # ========================================
@@ -116,15 +119,20 @@ if df is not None:
     yesterday = today - timedelta(days=1)
     current_month = today.replace(day=1)
 
+    # ✅ NaT 제거 및 날짜 타입 정리
+    df_clean = df[df['날짜'].notna()].copy()
+    df_clean = df_clean[df_clean['날짜'].apply(lambda x: isinstance(x, type(today)))]
+
     # 어제 / 이번달 데이터 필터
-    df_yesterday = df[df['날짜'] == yesterday]
-    df_this_month = df[df['날짜'] >= current_month]
+    df_yesterday = df_clean[df_clean['날짜'] == yesterday]
+    df_this_month = df_clean[df_clean['날짜'] >= current_month]
 
     # 데이터 없으면 가장 최근 날짜로 대체
     if df_yesterday.empty:
-        yesterday = df['날짜'].max()
-        df_yesterday = df[df['날짜'] == yesterday]
-        st.info(f"ℹ️ 어제 데이터가 없어 가장 최근 날짜({yesterday}) 기준으로 표시합니다.")
+        latest = df_clean['날짜'].max()
+        if pd.notna(latest):
+            yesterday = latest
+            df_yesterday = df_clean[df_clean['날짜'] == yesterday]
 
     st.success(f"✅ 총 {fmt(len(df))}건 데이터 로드 완료 | 기준일: {yesterday}")
 
@@ -148,7 +156,6 @@ if df is not None:
         if df_yesterday.empty:
             st.warning("해당 날짜의 데이터가 없습니다.")
         else:
-            # 핵심 지표 카드
             col1, col2, col3, col4 = st.columns(4)
             with col1:
                 st.metric("💰 총 거래금액", f"{fmt(df_yesterday['거래금액'].sum())}원")
@@ -162,7 +169,6 @@ if df is not None:
 
             st.divider()
 
-            # 물품종류별 비중
             col_left, col_right = st.columns(2)
 
             with col_left:
@@ -195,7 +201,6 @@ if df is not None:
 
             st.divider()
 
-            # 물품종류별 상세 테이블
             st.subheader("📋 물품종류별 상세 요약")
             summary = df_yesterday.groupby('물품종류').agg(
                 거래건수=('거래금액', 'count'),
@@ -214,7 +219,6 @@ if df is not None:
     with tab2:
         st.header(f"🏆 랭킹 ({yesterday})")
 
-        # 기간 선택
         period = st.radio("기간 선택", ["어제", "이번달"], horizontal=True)
         df_rank = df_yesterday if period == "어제" else df_this_month
 
@@ -309,72 +313,71 @@ if df is not None:
     with tab4:
         st.header(f"📈 이번달 일별 추이 ({current_month.strftime('%Y년 %m월')})")
 
-        daily = df_this_month.groupby('날짜').agg(
-            거래금액=('거래금액', 'sum'),
-            거래건수=('거래금액', 'count'),
-            수수료=('수수료', 'sum')
-        ).reset_index()
+        if df_this_month.empty:
+            st.warning("이번달 데이터가 없습니다.")
+        else:
+            daily = df_this_month.groupby('날짜').agg(
+                거래금액=('거래금액', 'sum'),
+                거래건수=('거래금액', 'count'),
+                수수료=('수수료', 'sum')
+            ).reset_index()
 
-        # 이번달 평균 대비 어제 비교
-        avg_amount = daily['거래금액'].mean()
-        avg_count = daily['거래건수'].mean()
-        yesterday_amount = daily[daily['날짜'] == yesterday]['거래금액'].values
-        yesterday_count = daily[daily['날짜'] == yesterday]['거래건수'].values
+            avg_amount = daily['거래금액'].mean()
+            avg_count = daily['거래건수'].mean()
+            yesterday_row = daily[daily['날짜'] == yesterday]
 
-        col1, col2 = st.columns(2)
-        with col1:
-            if len(yesterday_amount) > 0:
-                delta = yesterday_amount[0] - avg_amount
-                st.metric(
-                    "어제 거래금액 vs 이번달 일평균",
-                    f"{fmt(yesterday_amount[0])}원",
-                    delta=f"{fmt(delta)}원"
-                )
-        with col2:
-            if len(yesterday_count) > 0:
-                delta_c = yesterday_count[0] - avg_count
-                st.metric(
-                    "어제 거래건수 vs 이번달 일평균",
-                    f"{fmt(yesterday_count[0])}건",
-                    delta=f"{fmt(delta_c)}건"
-                )
+            col1, col2 = st.columns(2)
+            with col1:
+                if not yesterday_row.empty:
+                    delta = yesterday_row['거래금액'].values[0] - avg_amount
+                    st.metric(
+                        "어제 거래금액 vs 이번달 일평균",
+                        f"{fmt(yesterday_row['거래금액'].values[0])}원",
+                        delta=f"{fmt(delta)}원"
+                    )
+            with col2:
+                if not yesterday_row.empty:
+                    delta_c = yesterday_row['거래건수'].values[0] - avg_count
+                    st.metric(
+                        "어제 거래건수 vs 이번달 일평균",
+                        f"{fmt(yesterday_row['거래건수'].values[0])}건",
+                        delta=f"{fmt(delta_c)}건"
+                    )
 
-        st.divider()
+            st.divider()
 
-        # 거래금액 추이 차트
-        st.subheader("💰 일별 거래금액 추이")
-        fig5 = px.line(
-            daily,
-            x='날짜',
-            y='거래금액',
-            markers=True,
-            color_discrete_sequence=['#4C72B0']
-        )
-        fig5.add_hline(
-            y=avg_amount,
-            line_dash="dash",
-            line_color="red",
-            annotation_text=f"월평균: {fmt(avg_amount)}원"
-        )
-        fig5.update_layout(xaxis_title="날짜", yaxis_title="거래금액(원)")
-        st.plotly_chart(fig5, use_container_width=True)
+            st.subheader("💰 일별 거래금액 추이")
+            fig5 = px.line(
+                daily,
+                x='날짜',
+                y='거래금액',
+                markers=True,
+                color_discrete_sequence=['#4C72B0']
+            )
+            fig5.add_hline(
+                y=avg_amount,
+                line_dash="dash",
+                line_color="red",
+                annotation_text=f"월평균: {fmt(avg_amount)}원"
+            )
+            fig5.update_layout(xaxis_title="날짜", yaxis_title="거래금액(원)")
+            st.plotly_chart(fig5, use_container_width=True)
 
-        # 거래건수 추이 차트
-        st.subheader("📦 일별 거래건수 추이")
-        fig6 = px.bar(
-            daily,
-            x='날짜',
-            y='거래건수',
-            color_discrete_sequence=['#55A868']
-        )
-        fig6.add_hline(
-            y=avg_count,
-            line_dash="dash",
-            line_color="red",
-            annotation_text=f"월평균: {fmt(avg_count)}건"
-        )
-        fig6.update_layout(xaxis_title="날짜", yaxis_title="거래건수")
-        st.plotly_chart(fig6, use_container_width=True)
+            st.subheader("📦 일별 거래건수 추이")
+            fig6 = px.bar(
+                daily,
+                x='날짜',
+                y='거래건수',
+                color_discrete_sequence=['#55A868']
+            )
+            fig6.add_hline(
+                y=avg_count,
+                line_dash="dash",
+                line_color="red",
+                annotation_text=f"월평균: {fmt(avg_count)}건"
+            )
+            fig6.update_layout(xaxis_title="날짜", yaxis_title="거래건수")
+            st.plotly_chart(fig6, use_container_width=True)
 
     # ======================================================
     # TAB 5 : AI 분석
@@ -397,7 +400,6 @@ if df is not None:
                 df,
                 verbose=True,
                 allow_dangerous_code=True,
-                handle_parsing_errors=True,
                 agent_type="tool-calling"
             )
 
@@ -410,20 +412,11 @@ if df is not None:
                     with st.spinner("분석 중입니다..."):
                         try:
                             response = agent.invoke({"input": query})
-                            raw = response.get("output", "") if isinstance(response, dict) else response
-                            if isinstance(raw, list):
-                                output = "".join(
-                                    item.get("text", "") if isinstance(item, dict) else str(item)
-                                    for item in raw
-                                ).strip()
-                            else:
-                                output = str(raw).strip()
-
+                            output = extract_output(response)
                             if output:
                                 st.write(output)
                             else:
                                 st.warning("응답을 받지 못했습니다. 다시 질문해 주세요.")
-
                         except Exception as e:
                             st.error(f"❌ 분석 중 오류: {e}")
                             st.exception(e)

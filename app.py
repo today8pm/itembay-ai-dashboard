@@ -108,7 +108,58 @@ def fmt(number):
 
 
 # ========================================
-# 5. 메인 앱
+# 5. TOP 100 테이블 생성 함수
+# ========================================
+def make_seller_top100(data, year):
+    if data.empty:
+        st.warning(f"{year}년 데이터가 없습니다.")
+        return
+    result = data.groupby('판매자ID').agg(
+        거래건수=('거래금액', 'count'),
+        총거래금액=('거래금액', 'sum'),
+        총수수료=('수수료', 'sum')
+    ).reset_index().sort_values('총거래금액', ascending=False).head(100)
+    result.insert(0, '순위', range(1, len(result) + 1))
+    result['총거래금액'] = result['총거래금액'].apply(lambda x: f"{int(x):,}원")
+    result['총수수료'] = result['총수수료'].apply(lambda x: f"{int(x):,}원")
+    result.columns = ['순위', '판매자ID', '거래건수', '총거래금액', '총수수료']
+    st.dataframe(result, use_container_width=True, hide_index=True, height=600)
+    csv = result.to_csv(index=False, encoding='utf-8-sig')
+    st.download_button(
+        label="📥 CSV 다운로드",
+        data=csv,
+        file_name=f"{year}년_판매자TOP100.csv",
+        mime="text/csv",
+        key=f"seller_{year}"
+    )
+
+
+def make_buyer_top100(data, year):
+    if data.empty:
+        st.warning(f"{year}년 데이터가 없습니다.")
+        return
+    result = data.groupby('구매자ID').agg(
+        거래건수=('거래금액', 'count'),
+        총거래금액=('거래금액', 'sum'),
+        총수수료=('수수료', 'sum')
+    ).reset_index().sort_values('총거래금액', ascending=False).head(100)
+    result.insert(0, '순위', range(1, len(result) + 1))
+    result['총거래금액'] = result['총거래금액'].apply(lambda x: f"{int(x):,}원")
+    result['총수수료'] = result['총수수료'].apply(lambda x: f"{int(x):,}원")
+    result.columns = ['순위', '구매자ID', '거래건수', '총거래금액', '총수수료']
+    st.dataframe(result, use_container_width=True, hide_index=True, height=600)
+    csv = result.to_csv(index=False, encoding='utf-8-sig')
+    st.download_button(
+        label="📥 CSV 다운로드",
+        data=csv,
+        file_name=f"{year}년_구매자TOP100.csv",
+        mime="text/csv",
+        key=f"buyer_{year}"
+    )
+
+
+# ========================================
+# 6. 메인 앱
 # ========================================
 df = load_combined_data_from_s3()
 
@@ -119,13 +170,15 @@ if df is not None:
     yesterday = today - timedelta(days=1)
     current_month = today.replace(day=1)
 
-    # ✅ NaT 제거 및 날짜 타입 정리
+    # NaT 제거 및 날짜 타입 정리
     df_clean = df[df['날짜'].notna()].copy()
     df_clean = df_clean[df_clean['날짜'].apply(lambda x: isinstance(x, type(today)))]
 
-    # 어제 / 이번달 데이터 필터
+    # 어제 / 이번달 / 연도별 데이터 필터
     df_yesterday = df_clean[df_clean['날짜'] == yesterday]
     df_this_month = df_clean[df_clean['날짜'] >= current_month]
+    df_2025 = df_clean[df_clean['날짜'].apply(lambda x: x.year == 2025 if hasattr(x, 'year') else False)]
+    df_2026 = df_clean[df_clean['날짜'].apply(lambda x: x.year == 2026 if hasattr(x, 'year') else False)]
 
     # 데이터 없으면 가장 최근 날짜로 대체
     if df_yesterday.empty:
@@ -133,18 +186,20 @@ if df is not None:
         if pd.notna(latest):
             yesterday = latest
             df_yesterday = df_clean[df_clean['날짜'] == yesterday]
+            st.info(f"ℹ️ 어제 데이터가 없어 가장 최근 날짜({yesterday}) 기준으로 표시합니다.")
 
     st.success(f"✅ 총 {fmt(len(df))}건 데이터 로드 완료 | 기준일: {yesterday}")
 
     # ========================================
     # 탭 구성
     # ========================================
-    tab1, tab2, tab3, tab4, tab5 = st.tabs([
+    tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
         "📊 어제 현황",
         "🏆 랭킹",
         "🎮 게임별 현황",
         "📈 이번달 추이",
-        "🤖 AI 분석"
+        "🤖 AI 분석",
+        "👑 연간 TOP 100"
     ])
 
     # ======================================================
@@ -170,7 +225,6 @@ if df is not None:
             st.divider()
 
             col_left, col_right = st.columns(2)
-
             with col_left:
                 st.subheader("🗂️ 물품종류별 거래건수")
                 type_count = df_yesterday.groupby('물품종류').size().reset_index(name='거래건수')
@@ -423,6 +477,33 @@ if df is not None:
 
         except Exception as e:
             st.error(f"🚨 AI 엔진 초기화 실패: {e}")
+
+    # ======================================================
+    # TAB 6 : 연간 TOP 100
+    # ======================================================
+    with tab6:
+        st.header("👑 연간 판매자 / 구매자 TOP 100")
+        st.caption("S3 데이터 업데이트 시 자동 반영됩니다.")
+
+        year_tab1, year_tab2 = st.tabs(["📅 2025년", "📅 2026년"])
+
+        with year_tab1:
+            st.subheader(f"📊 2025년 데이터 총 {fmt(len(df_2025))}건")
+            seller_tab_25, buyer_tab_25 = st.tabs(["🥇 판매자 TOP 100", "🥈 구매자 TOP 100"])
+            with seller_tab_25:
+                make_seller_top100(df_2025, 2025)
+            with buyer_tab_25:
+                make_buyer_top100(df_2025, 2025)
+
+        with year_tab2:
+            latest_2026 = df_2026['날짜'].max() if not df_2026.empty else '없음'
+            st.subheader(f"📊 2026년 데이터 총 {fmt(len(df_2026))}건")
+            st.caption(f"최근 데이터 기준일: {latest_2026}")
+            seller_tab_26, buyer_tab_26 = st.tabs(["🥇 판매자 TOP 100", "🥈 구매자 TOP 100"])
+            with seller_tab_26:
+                make_seller_top100(df_2026, 2026)
+            with buyer_tab_26:
+                make_buyer_top100(df_2026, 2026)
 
 else:
     st.warning("transdb 폴더 내에 데이터 파일이 없거나 S3 설정을 확인해야 합니다.")
